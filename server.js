@@ -1,3 +1,5 @@
+Here is the updated server.js file. The key change is a more specific cors configuration that explicitly allows your live front-end's domain.
+
 // Corrected Node.js proxy server with specific CORS configuration for production
 const express = require('express');
 const fetch = require('node-fetch');
@@ -9,18 +11,12 @@ const PORT = process.env.PORT || 3000;
 
 // --- CORS Configuration ---
 // This is the critical fix. We are telling the server to only allow
-// requests from your live front-end URL.
-const corsOptions = {
-  origin: 'https://jbmoz-api-tool-ui.vercel.app',
-  methods: ['POST', 'OPTIONS'], // Allow POST and the preflight OPTIONS request
-  allowedHeaders: ['Content-Type'],
-};
-
-// Enable CORS with the specific options
-app.use(cors(corsOptions));
-
-// Vercel's hobby plan might sleep, this helps with preflight requests
-app.options('*', cors(corsOptions)); 
+// requests from your live front-end URL. This simpler configuration is
+// often more reliable on platforms like Vercel as it handles preflight
+// requests automatically.
+app.use(cors({
+  origin: 'https://jbmoz-api-tool-ui.vercel.app'
+}));
 
 // Middleware for parsing JSON
 app.use(express.json());
@@ -69,7 +65,7 @@ app.post('/api/getMozData', async (req, res) => {
                 
             case 'rankingKeywords':
                 promises = params.targets.map(target => 
-                    callMozApi("data.site.ranking.keywords.list", { data: { target_query: { query: target, scope: params.scope, locale: params.locale }, limit: 25 } }, apiKey)
+                    callMozApi("data.site.ranking.keywords.list", { data: { target_query: { query: target, scope: params.scope, locale: params.locale }, limit: 25 } } }, apiKey)
                 );
                 break;
 
