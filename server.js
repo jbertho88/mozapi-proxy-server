@@ -9,17 +9,24 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- CORS Configuration ---
-// This is the critical fix. We are telling the server to only allow
-// requests from your live front-end URL. This simpler configuration is
-// often more reliable on platforms like Vercel as it handles preflight
-// requests automatically.
-app.use(cors({
-  origin: 'https://jbmoz-api-tool-ui.vercel.app'
-}));
-
 // Middleware for parsing JSON
 app.use(express.json());
+
+// --- CORS Configuration ---
+// This is a more direct approach to handling CORS in a serverless environment like Vercel.
+// We are manually setting the headers on every request/response.
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', 'https://jbmoz-api-tool-ui.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle the preflight request for OPTIONS method
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 
 // --- Main Endpoint ---
