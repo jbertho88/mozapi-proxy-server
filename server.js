@@ -1,4 +1,4 @@
-// Corrected Node.js proxy server with explicit CORS handling for Vercel
+// Corrected Node.js proxy server - CORS is now handled by vercel.json
 const express = require('express');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
@@ -9,27 +9,8 @@ const PORT = process.env.PORT || 3000;
 // Middleware for parsing JSON
 app.use(express.json());
 
-// --- CORS Configuration ---
-// A direct approach to handling CORS headers, which is often more reliable
-// on serverless platforms like Vercel.
-app.use((req, res, next) => {
-  // Set the allowed origin. You can also use '*' for testing, but your specific URL is more secure.
-  res.setHeader('Access-Control-Allow-Origin', 'https://jbmoz-api-tool-ui.vercel.app');
-  // Set allowed methods
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  // Set allowed headers
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  // Browsers send an OPTIONS request (a "preflight" request) to check if the
-  // actual request is safe to send. We need to respond to this preflight
-  // request with a 200 OK status.
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  next();
-});
-
+// --- CORS Configuration has been REMOVED ---
+// Vercel's infrastructure will now handle this via the vercel.json file.
 
 // --- Main Endpoint ---
 app.post('/api/getMozData', async (req, res) => {
