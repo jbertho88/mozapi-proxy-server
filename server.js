@@ -1,10 +1,7 @@
-Here is the updated server.js file. The key change is a more specific cors configuration that explicitly allows your live front-end's domain.
-
-// Corrected Node.js proxy server with specific CORS configuration for production
+// Corrected Node.js proxy server with explicit CORS handling for Vercel
 const express = require('express');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
-const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,25 +10,29 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // --- CORS Configuration ---
-// This is a more direct approach to handling CORS in a serverless environment like Vercel.
-// We are manually setting the headers on every request/response.
+// A direct approach to handling CORS headers, which is often more reliable
+// on serverless platforms like Vercel.
 app.use((req, res, next) => {
+  // Set the allowed origin. You can also use '*' for testing, but your specific URL is more secure.
   res.setHeader('Access-Control-Allow-Origin', 'https://jbmoz-api-tool-ui.vercel.app');
+  // Set allowed methods
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  // Set allowed headers
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // Handle the preflight request for OPTIONS method
+
+  // Browsers send an OPTIONS request (a "preflight" request) to check if the
+  // actual request is safe to send. We need to respond to this preflight
+  // request with a 200 OK status.
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  
+
   next();
 });
 
 
 // --- Main Endpoint ---
 app.post('/api/getMozData', async (req, res) => {
-    // ... the rest of your server code remains exactly the same
     const { apiKey, method, params } = req.body;
 
     if (!apiKey || !method || !params) {
