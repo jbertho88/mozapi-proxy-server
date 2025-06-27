@@ -54,7 +54,7 @@ export default async function handler(req, res) {
         break;
 
       case 'rankingKeywords':
-        // **UPDATED LOGIC HERE**
+        // **CORRECTED LOGIC HERE**
         // Use the limit from params, ensuring it's a valid number between 1 and 500, default to 25.
         const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
         promises = params.targets.map(target =>
