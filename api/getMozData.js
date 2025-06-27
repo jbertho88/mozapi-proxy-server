@@ -53,14 +53,20 @@ export default async function handler(req, res) {
         );
         break;
 
-      case 'rankingKeywords':
-        // **CORRECTED LOGIC HERE**
-        // Use the limit from params, ensuring it's a valid number between 1 and 500, default to 25.
+      case 'rankingKeywords': {
         const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
         promises = params.targets.map(target =>
-          callMozApi("data.site.ranking.keywords.list", { data: { target_query: { query: target, scope: params.scope, locale: params.locale }, limit: limit } }, apiKey)
+          // **CORRECTED PAYLOAD STRUCTURE**
+          // The limit parameter is now correctly nested inside a "page" object.
+          callMozApi("data.site.ranking.keywords.list", {
+            data: {
+              target_query: { query: target, scope: params.scope, locale: params.locale },
+              page: { limit: limit } 
+            }
+          }, apiKey)
         );
         break;
+      }
 
       case 'relatedKeywords':
         promises = params.keywords.map(keyword =>
