@@ -5,7 +5,6 @@ import crypto from 'crypto';
 // This is the main handler Vercel will run
 export default async function handler(req, res) {
   // --- CORS Configuration ---
-  // Set headers to allow requests from your specific front-end domain.
   res.setHeader('Access-Control-Allow-Origin', 'https://jbmoz-api-tool-ui.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -55,8 +54,11 @@ export default async function handler(req, res) {
         break;
 
       case 'rankingKeywords':
+        // **UPDATED LOGIC HERE**
+        // Use the limit from params, ensuring it's a valid number between 1 and 500, default to 25.
+        const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
         promises = params.targets.map(target =>
-          callMozApi("data.site.ranking.keywords.list", { data: { target_query: { query: target, scope: params.scope, locale: params.locale }, limit: 25 } }, apiKey)
+          callMozApi("data.site.ranking.keywords.list", { data: { target_query: { query: target, scope: params.scope, locale: params.locale }, limit: limit } }, apiKey)
         );
         break;
 
@@ -95,7 +97,6 @@ export default async function handler(req, res) {
 
 /**
  * A helper function to make a single, authenticated call to the Moz JSON-RPC API.
- * This function remains the same.
  */
 async function callMozApi(apiMethodName, apiParams, apiKey) {
   const MOZ_API_ENDPOINT = "https://api.moz.com/jsonrpc";
