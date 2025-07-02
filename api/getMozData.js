@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         const metricMap = { 'all': 'data.keyword.metrics.fetch', 'volume': 'data.keyword.metrics.volume.fetch', 'difficulty': 'data.keyword.metrics.difficulty.fetch', 'opportunity': 'data.keyword.metrics.opportunity.fetch', 'priority': 'data.keyword.metrics.priority.fetch' };
         const apiMethod = metricMap[params.metricType] || metricMap['all'];
         promises = params.keywords.map(keyword =>
-          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale, device: params.device, engine: params.engine } } }, apiKey)
+          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale, device: "desktop", engine: "google" } } }, apiKey)
         );
         break;
 
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
       case 'searchIntent':
         promises = params.keywords.map(keyword =>
-          callMozApi("data.keyword.search.intent.fetch", { data: { serp_query: { keyword: keyword, locale: params.locale, device: params.device, engine: params.engine } } }, apiKey)
+          callMozApi("data.keyword.search.intent.fetch", { data: { serp_query: { keyword: keyword, locale: params.locale, device: "desktop", engine: "google" } } }, apiKey)
         );
         break;
 
