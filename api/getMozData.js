@@ -49,14 +49,13 @@ export default async function handler(req, res) {
 
       case 'searchIntent':
         promises = params.keywords.map(keyword =>
-          callMozApi("data.keyword.search.intent.fetch", { data: { serp_query: { keyword: keyword, locale: params.locale, device: "desktop", engine: "google" } } }, apiKey)
+          callMozApi("data.keyword.search.intent.fetch", { data: { serp_query: { keyword: keyword, locale: params.locale, device: params.device, engine: params.engine } } }, apiKey)
         );
         break;
 
       case 'rankingKeywords': {
         const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
         promises = params.targets.map(target =>
-          // **CORRECTED PAYLOAD STRUCTURE**
           // The limit parameter is now correctly nested inside a "page" object.
           callMozApi("data.site.ranking.keywords.list", {
             data: {
