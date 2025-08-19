@@ -17,11 +17,17 @@ export default async function handler(req, res) {
   // --- Main Logic ---
   const { apiKey, method, params } = req.body;
 
-  if (!apiKey || !method || !params) {
-    return res.status(400).json({ error: 'Missing API Key, method, or parameters.' });
+  if (!apiKey || !method) { // Params not required for quota check
+    return res.status(400).json({ error: 'Missing API Key or method.' });
   }
 
   try {
+    // **NEW**: Handle quota check as a special case
+    if (method === 'getQuota') {
+      const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
+      return res.status(200).json(quotaData);
+    }
+
     let promises = [];
 
     switch (method) {
@@ -56,7 +62,6 @@ export default async function handler(req, res) {
       case 'rankingKeywords': {
         const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
         promises = params.targets.map(target =>
-          // The limit parameter is now correctly nested inside a "page" object.
           callMozApi("data.site.ranking.keywords.list", {
             data: {
               target_query: { query: target, scope: params.scope, locale: params.locale },
