@@ -98,10 +98,14 @@ export default async function handler(req, res) {
       
       case 'recentlyGainedLinks': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        const options = {};
+        if (params.beginDate) options.begin_date = params.beginDate;
+        if (params.endDate) options.end_date = params.endDate;
         promises = params.targets.map(target =>
             callMozApi("data.site.linking-domain.filter.recently-gained", {
                 data: {
                     site_query: { query: target, scope: params.scope },
+                    options: Object.keys(options).length > 0 ? options : undefined,
                     offset: { limit: limit }
                 }
             }, apiKey)
@@ -111,10 +115,14 @@ export default async function handler(req, res) {
 
       case 'recentlyLostLinks': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+         const options = {};
+        if (params.beginDate) options.begin_date = params.beginDate;
+        if (params.endDate) options.end_date = params.endDate;
         promises = params.targets.map(target =>
             callMozApi("data.site.linking-domain.filter.recently-lost", {
                 data: {
                     site_query: { query: target, scope: params.scope },
+                    options: Object.keys(options).length > 0 ? options : undefined,
                     offset: { limit: limit }
                 }
             }, apiKey)
@@ -154,13 +162,60 @@ export default async function handler(req, res) {
                       site_query: { query: target, scope: params.scope },
                       options: {
                           sort: params.sort,
-                          filter: params.filter === 'all' ? null : params.filter
+                          filter: params.filter === 'all' ? undefined : params.filter
                       },
                       offset: { limit: limit }
                   }
               }, apiKey)
           );
           break;
+      }
+      
+      case 'linkIntersect': {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        const is_linking_to = params.is_linking_to.map(q => ({ query: q, scope: params.scope }));
+        const not_linking_to = params.not_linking_to.map(q => ({ query: q, scope: params.scope }));
+        
+        promises = [ // This endpoint only supports one call at a time
+            callMozApi("data.site.link.intersect.fetch", {
+                data: {
+                    is_linking_to,
+                    not_linking_to,
+                    offset: { limit }
+                }
+            }, apiKey)
+        ];
+        break;
+      }
+
+      case 'listLinks': {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        promises = params.targets.map(target =>
+            callMozApi("data.site.link.list", {
+                data: {
+                    site_query: { query: target, scope: params.scope },
+                    options: {
+                        sort: params.sort,
+                        filters: params.filters
+                    },
+                    offset: { limit: limit }
+                }
+            }, apiKey)
+        );
+        break;
+      }
+
+      case 'linkStatus': {
+        // This is a single-target endpoint, no mapping needed
+        promises = [
+            callMozApi("data.site.link.status.fetch", {
+                data: {
+                    target_site_query: { query: params.targetQuery, scope: params.targetScope },
+                    source_site_query: { query: params.sourceQuery, scope: params.sourceScope }
+                }
+            }, apiKey)
+        ];
+        break;
       }
 
       default:
