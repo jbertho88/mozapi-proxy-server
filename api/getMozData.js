@@ -84,7 +84,7 @@ export default async function handler(req, res) {
         break;
       
       case 'anchorText': {
-        const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
         promises = params.targets.map(target =>
             callMozApi("data.site.anchor-text.list", {
                 data: {
@@ -94,6 +94,73 @@ export default async function handler(req, res) {
             }, apiKey)
         );
         break;
+      }
+      
+      case 'recentlyGainedLinks': {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        promises = params.targets.map(target =>
+            callMozApi("data.site.linking-domain.filter.recently-gained", {
+                data: {
+                    site_query: { query: target, scope: params.scope },
+                    offset: { limit: limit }
+                }
+            }, apiKey)
+        );
+        break;
+      }
+
+      case 'recentlyLostLinks': {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        promises = params.targets.map(target =>
+            callMozApi("data.site.linking-domain.filter.recently-lost", {
+                data: {
+                    site_query: { query: target, scope: params.scope },
+                    offset: { limit: limit }
+                }
+            }, apiKey)
+        );
+        break;
+      }
+      
+      case 'linkingDomains': {
+          const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+          promises = params.targets.map(target =>
+              callMozApi("data.site.linking-domain.list", {
+                  data: {
+                      site_query: { query: target, scope: params.scope },
+                      offset: { limit: limit }
+                  }
+              }, apiKey)
+          );
+          break;
+      }
+
+      case 'finalRedirect': {
+          promises = params.targets.map(target =>
+              callMozApi("data.site.redirect.fetch", {
+                  data: {
+                      site_query: { query: target, scope: params.scope }
+                  }
+              }, apiKey)
+          );
+          break;
+      }
+
+      case 'topPages': {
+          const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+          promises = params.targets.map(target =>
+              callMozApi("data.site.top-page.list", {
+                  data: {
+                      site_query: { query: target, scope: params.scope },
+                      options: {
+                          sort: params.sort,
+                          filter: params.filter === 'all' ? null : params.filter
+                      },
+                      offset: { limit: limit }
+                  }
+              }, apiKey)
+          );
+          break;
       }
 
       default:
