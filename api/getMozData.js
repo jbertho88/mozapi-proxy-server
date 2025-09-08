@@ -17,12 +17,11 @@ export default async function handler(req, res) {
   // --- Main Logic ---
   const { apiKey, method, params } = req.body;
 
-  if (!apiKey || !method) { // Params not required for quota check
+  if (!apiKey || !method) {
     return res.status(400).json({ error: 'Missing API Key or method.' });
   }
 
   try {
-    // **NEW**: Handle quota check as a special case
     if (method === 'getQuota') {
       const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
       return res.status(200).json(quotaData);
@@ -83,6 +82,19 @@ export default async function handler(req, res) {
           callMozApi("data.site.ranking-keyword.count", { data: { target_query: { query: target, scope: params.scope, locale: params.locale } } }, apiKey)
         );
         break;
+      
+      case 'anchorText': {
+        const limit = Math.max(1, Math.min(500, parseInt(params.limit, 10) || 25));
+        promises = params.targets.map(target =>
+            callMozApi("data.site.anchor-text.list", {
+                data: {
+                    site_query: { query: target, scope: params.scope },
+                    offset: { limit: limit }
+                }
+            }, apiKey)
+        );
+        break;
+      }
 
       default:
         return res.status(400).json({ error: 'Invalid API method specified.' });
@@ -130,3 +142,4 @@ async function callMozApi(apiMethodName, apiParams, apiKey) {
 
   return data.result;
 };
+
