@@ -17,19 +17,19 @@ export default async function handler(req, res) {
   // --- Main Logic ---
   const { apiKey, method, params } = req.body;
 
-  if (!apiKey || !method) {
-    return res.status(400).json({ error: 'Missing API Key or method.' });
+  if (!apiKey || !method || !params) {
+    return res.status(400).json({ error: 'Missing API Key, method, or parameters.' });
   }
 
   try {
-    if (method === 'getQuota') {
-      const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
-      return res.status(200).json(quotaData);
-    }
-
     let promises = [];
 
     switch (method) {
+      case 'getQuota':
+        // This is a single call, not a loop, so we handle it separately.
+        const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
+        return res.status(200).json({ quota: quotaData });
+
       case 'siteMetrics':
         promises = params.targets.map(target =>
           callMozApi("data.site.metrics.fetch", { data: { site_query: { query: target, scope: params.scope } } }, apiKey)
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
         const metricMap = { 'all': 'data.keyword.metrics.fetch', 'volume': 'data.keyword.metrics.volume.fetch', 'difficulty': 'data.keyword.metrics.difficulty.fetch', 'opportunity': 'data.keyword.metrics.opportunity.fetch', 'priority': 'data.keyword.metrics.priority.fetch' };
         const apiMethod = metricMap[params.metricType] || metricMap['all'];
         promises = params.keywords.map(keyword =>
-          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale, device: "desktop", engine: "google" } } }, apiKey)
+          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale } } }, apiKey)
         );
         break;
 
@@ -85,137 +85,88 @@ export default async function handler(req, res) {
       
       case 'anchorText': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
-        promises = params.targets.map(target =>
-            callMozApi("data.site.anchor-text.list", {
-                data: {
-                    site_query: { query: target, scope: params.scope },
-                    offset: { limit: limit }
-                }
-            }, apiKey)
+        promises = params.targets.map(target => 
+          callMozApi("data.site.anchor-text.list", { data: { site_query: { query: target, scope: params.scope }, offset: { limit } } }, apiKey)
         );
         break;
       }
-      
+
       case 'recentlyGainedLinks': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
         const options = {};
         if (params.beginDate) options.begin_date = params.beginDate;
         if (params.endDate) options.end_date = params.endDate;
-        promises = params.targets.map(target =>
-            callMozApi("data.site.linking-domain.filter.recently-gained", {
-                data: {
-                    site_query: { query: target, scope: params.scope },
-                    options: Object.keys(options).length > 0 ? options : undefined,
-                    offset: { limit: limit }
-                }
-            }, apiKey)
+        promises = params.targets.map(target => 
+          callMozApi("data.site.linking-domain.filter.recently-gained", { data: { site_query: { query: target, scope: params.scope }, options, offset: { limit } } }, apiKey)
         );
         break;
       }
 
       case 'recentlyLostLinks': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
-         const options = {};
+        const options = {};
         if (params.beginDate) options.begin_date = params.beginDate;
         if (params.endDate) options.end_date = params.endDate;
-        promises = params.targets.map(target =>
-            callMozApi("data.site.linking-domain.filter.recently-lost", {
-                data: {
-                    site_query: { query: target, scope: params.scope },
-                    options: Object.keys(options).length > 0 ? options : undefined,
-                    offset: { limit: limit }
-                }
-            }, apiKey)
+        promises = params.targets.map(target => 
+          callMozApi("data.site.linking-domain.filter.recently-lost", { data: { site_query: { query: target, scope: params.scope }, options, offset: { limit } } }, apiKey)
         );
         break;
       }
       
       case 'linkingDomains': {
           const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+          const options = { sort: params.sort, filters: params.filters };
           promises = params.targets.map(target =>
-              callMozApi("data.site.linking-domain.list", {
-                  data: {
-                      site_query: { query: target, scope: params.scope },
-                      offset: { limit: limit }
-                  }
-              }, apiKey)
-          );
-          break;
-      }
-
-      case 'finalRedirect': {
-          promises = params.targets.map(target =>
-              callMozApi("data.site.redirect.fetch", {
-                  data: {
-                      site_query: { query: target, scope: params.scope }
-                  }
-              }, apiKey)
-          );
-          break;
-      }
-
-      case 'topPages': {
-          const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
-          promises = params.targets.map(target =>
-              callMozApi("data.site.top-page.list", {
-                  data: {
-                      site_query: { query: target, scope: params.scope },
-                      options: {
-                          sort: params.sort,
-                          filter: params.filter === 'all' ? undefined : params.filter
-                      },
-                      offset: { limit: limit }
-                  }
-              }, apiKey)
+              callMozApi("data.site.linking-domain.list", { data: { site_query: { query: target, scope: params.scope }, options, offset: { limit } } }, apiKey)
           );
           break;
       }
       
+      case 'finalRedirect':
+        promises = params.targets.map(target => 
+          callMozApi("data.site.redirect.fetch", { data: { site_query: { query: target, scope: params.scope } } }, apiKey)
+        );
+        break;
+        
+      case 'topPages': {
+          const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+          const options = { sort: params.sort };
+          if (params.filter && params.filter !== 'all') {
+            options.filter = params.filter;
+          }
+          promises = params.targets.map(target =>
+              callMozApi("data.site.top-page.list", { data: { site_query: { query: target, scope: params.scope }, options, offset: { limit } } }, apiKey)
+          );
+          break;
+      }
+
       case 'linkIntersect': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
-        const is_linking_to = params.is_linking_to.map(q => ({ query: q, scope: params.scope }));
-        const not_linking_to = params.not_linking_to.map(q => ({ query: q, scope: params.scope }));
-        
-        promises = [ // This endpoint only supports one call at a time
-            callMozApi("data.site.link.intersect.fetch", {
-                data: {
-                    is_linking_to,
-                    not_linking_to,
-                    offset: { limit }
-                }
-            }, apiKey)
-        ];
-        break;
+        const options = {
+            minimum_matching_targets: params.minimum_matching_targets,
+            scope: params.scope,
+            sort: params.sort
+        };
+        // This is a single-call endpoint, not a loop
+        const promise = callMozApi("data.site.link.intersect.fetch", { data: { is_linking_to: params.is_linking_to, not_linking_to: params.not_linking_to, options, offset: { limit } } }, apiKey);
+        const result = await Promise.resolve(promise);
+        return res.status(200).json([{ status: 'success', data: result }]); // Wrap in array to match other responses
       }
 
       case 'listLinks': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
-        promises = params.targets.map(target =>
-            callMozApi("data.site.link.list", {
-                data: {
-                    site_query: { query: target, scope: params.scope },
-                    options: {
-                        sort: params.sort,
-                        filters: params.filters
-                    },
-                    offset: { limit: limit }
-                }
-            }, apiKey)
+        const options = { sort: params.sort, filters: params.filters };
+        promises = params.targets.map(target => 
+          callMozApi("data.site.link.list", { data: { site_query: { query: target, scope: params.scope }, options, offset: { limit } } }, apiKey)
         );
         break;
       }
 
       case 'linkStatus': {
-        // This is a single-target endpoint, no mapping needed
-        promises = [
-            callMozApi("data.site.link.status.fetch", {
-                data: {
-                    target_site_query: { query: params.targetQuery, scope: params.targetScope },
-                    source_site_query: { query: params.sourceQuery, scope: params.sourceScope }
-                }
-            }, apiKey)
-        ];
-        break;
+         // This is a single-call endpoint
+         const promise = callMozApi("data.site.link.status.fetch", { data: { target_site_query: { query: params.targetQuery, scope: params.targetScope }, source_site_query: { query: params.sourceQuery, scope: params.sourceScope } } }, apiKey);
+         const result = await Promise.resolve(promise);
+         return res.status(200).json([{ status: 'success', data: result }]);
       }
 
       default:
