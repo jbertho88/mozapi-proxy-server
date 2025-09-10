@@ -17,9 +17,16 @@ export default async function handler(req, res) {
   // --- Main Logic ---
   const { apiKey, method, params } = req.body;
 
-  if (!apiKey || !method || !params) {
-    return res.status(400).json({ error: 'Missing API Key, method, or parameters.' });
+  // Initial validation for required fields
+  if (!apiKey || !method) {
+    return res.status(400).json({ error: 'Missing API Key or method.' });
   }
+
+  // **FIX:** Only require params if the method is not 'getQuota'
+  if (method !== 'getQuota' && !params) {
+    return res.status(400).json({ error: 'Missing parameters for the requested method.' });
+  }
+
 
   try {
     let promises = [];
