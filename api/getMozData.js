@@ -26,7 +26,6 @@ export default async function handler(req, res) {
 
     switch (method) {
       case 'getQuota':
-        // This is a single call, not a loop, so we handle it separately.
         const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
         return res.status(200).json({ quota: quotaData });
 
@@ -36,13 +35,15 @@ export default async function handler(req, res) {
         );
         break;
 
-      case 'keywordMetrics':
+      case 'keywordMetrics': {
         const metricMap = { 'all': 'data.keyword.metrics.fetch', 'volume': 'data.keyword.metrics.volume.fetch', 'difficulty': 'data.keyword.metrics.difficulty.fetch', 'opportunity': 'data.keyword.metrics.opportunity.fetch', 'priority': 'data.keyword.metrics.priority.fetch' };
         const apiMethod = metricMap[params.metricType] || metricMap['all'];
         promises = params.keywords.map(keyword =>
-          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale } } }, apiKey)
+          // FIXED: Re-added hardcoded device and engine as they are required by the API
+          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale, device: 'desktop', engine: 'google' } } }, apiKey)
         );
         break;
+      }
 
       case 'brandAuthority':
         promises = params.targets.map(target => {
@@ -147,10 +148,9 @@ export default async function handler(req, res) {
             scope: params.scope,
             sort: params.sort
         };
-        // This is a single-call endpoint, not a loop
         const promise = callMozApi("data.site.link.intersect.fetch", { data: { is_linking_to: params.is_linking_to, not_linking_to: params.not_linking_to, options, offset: { limit } } }, apiKey);
         const result = await Promise.resolve(promise);
-        return res.status(200).json([{ status: 'success', data: result }]); // Wrap in array to match other responses
+        return res.status(200).json([{ status: 'success', data: result }]);
       }
 
       case 'listLinks': {
@@ -163,7 +163,6 @@ export default async function handler(req, res) {
       }
 
       case 'linkStatus': {
-         // This is a single-call endpoint
          const promise = callMozApi("data.site.link.status.fetch", { data: { target_site_query: { query: params.targetQuery, scope: params.targetScope }, source_site_query: { query: params.sourceQuery, scope: params.sourceScope } } }, apiKey);
          const result = await Promise.resolve(promise);
          return res.status(200).json([{ status: 'success', data: result }]);
