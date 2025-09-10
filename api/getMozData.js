@@ -17,14 +17,12 @@ export default async function handler(req, res) {
   // --- Main Logic ---
   const { apiKey, method, params } = req.body;
 
-  // Initial validation for required fields
-  if (!apiKey || !method) {
+  if (!apiKey || !method ) {
     return res.status(400).json({ error: 'Missing API Key or method.' });
   }
-
-  // **FIX:** Only require params if the method is not 'getQuota'
+   // Special case for getQuota which doesn't need params
   if (method !== 'getQuota' && !params) {
-    return res.status(400).json({ error: 'Missing parameters for the requested method.' });
+    return res.status(400).json({ error: 'Missing parameters for this method.' });
   }
 
 
@@ -33,6 +31,7 @@ export default async function handler(req, res) {
 
     switch (method) {
       case 'getQuota':
+        // This is a single call, not a loop, so we handle it separately.
         const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
         return res.status(200).json({ quota: quotaData });
 
@@ -42,15 +41,13 @@ export default async function handler(req, res) {
         );
         break;
 
-      case 'keywordMetrics': {
+      case 'keywordMetrics':
         const metricMap = { 'all': 'data.keyword.metrics.fetch', 'volume': 'data.keyword.metrics.volume.fetch', 'difficulty': 'data.keyword.metrics.difficulty.fetch', 'opportunity': 'data.keyword.metrics.opportunity.fetch', 'priority': 'data.keyword.metrics.priority.fetch' };
         const apiMethod = metricMap[params.metricType] || metricMap['all'];
         promises = params.keywords.map(keyword =>
-          // FIXED: Re-added hardcoded device and engine as they are required by the API
-          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale, device: 'desktop', engine: 'google' } } }, apiKey)
+          callMozApi(apiMethod, { data: { serp_query: { keyword: keyword, locale: params.locale, device: params.device || 'desktop', engine: params.engine || 'google' } } }, apiKey)
         );
         break;
-      }
 
       case 'brandAuthority':
         promises = params.targets.map(target => {
@@ -157,7 +154,7 @@ export default async function handler(req, res) {
         };
         const promise = callMozApi("data.site.link.intersect.fetch", { data: { is_linking_to: params.is_linking_to, not_linking_to: params.not_linking_to, options, offset: { limit } } }, apiKey);
         const result = await Promise.resolve(promise);
-        return res.status(200).json([{ status: 'success', data: result }]);
+        return res.status(200).json([{ status: 'success', data: result }]); 
       }
 
       case 'listLinks': {
