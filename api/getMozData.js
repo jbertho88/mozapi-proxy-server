@@ -31,7 +31,6 @@ export default async function handler(req, res) {
 
     switch (method) {
       case 'getQuota':
-        // This is a single call, not a loop, so we handle it separately.
         const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
         return res.status(200).json({ quota: quotaData });
 
@@ -208,14 +207,24 @@ async function callMozApi(apiMethodName, apiParams, apiKey) {
     },
     body: JSON.stringify(payload)
   });
-
-  const data = await response.json();
-
-  if (!response.ok || data.error) {
-    const errorMessage = data.error ? data.error.message : `API returned status ${response.status}`;
-    throw new Error(errorMessage);
+  
+  // Clone the response to safely read it twice
+  const resClone = response.clone();
+  try {
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      const errorMessage = data.error ? data.error.message : `API returned status ${response.status}`;
+      throw new Error(errorMessage);
+    }
+    return data.result;
+  } catch (e) {
+      if (e instanceof SyntaxError) { // This will catch the "Unexpected token '<'" error
+          console.error("Failed to parse JSON from Moz API. The API might be temporarily unavailable.");
+          const textResponse = await resClone.text();
+          console.error("API Response Text:", textResponse.substring(0, 500)); // Log the first 500 chars
+          throw new Error("The Moz API returned an invalid response (likely HTML). It may be temporarily busy. Please try again shortly.");
+      }
+      throw e; // Re-throw other errors
   }
-
-  return data.result;
 };
 
