@@ -27,13 +27,45 @@ export default async function handler(req, res) {
 
 
   try {
-    let promises = [];
-
-    switch (method) {
-      case 'getQuota':
+    // Single-call endpoints are handled and returned immediately.
+    if (method === 'getQuota') {
         const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
         return res.status(200).json({ quota: quotaData });
+    }
 
+    if (method === 'linkIntersect') {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        const options = {
+            minimum_matching_targets: params.minimum_matching_targets,
+            scope: params.scope,
+            sort: params.sort
+        };
+        const result = await callMozApi("data.site.link.intersect.fetch", { data: { is_linking_to: params.is_linking_to, not_linking_to: params.not_linking_to, options, offset: { limit } } }, apiKey);
+        return res.status(200).json([{ status: 'success', data: result }]); 
+    }
+
+    if (method === 'linkStatus') {
+         const result = await callMozApi("data.site.link.status.fetch", { data: { target_site_query: { query: params.targetQuery, scope: params.targetScope }, source_site_query: { query: params.sourceQuery, scope: params.sourceScope } } }, apiKey);
+         return res.status(200).json([{ status: 'success', data: result }]);
+    }
+      
+    if (method === 'filterLinksByDomain') {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        const options = { filters: params.filters };
+        const promises = params.targetQueries.flatMap(targetQuery => 
+            params.sourceQueries.map(sourceQuery => 
+                callMozApi("data.site.link.filter.domain", { data: { site_query: {query: targetQuery, scope: params.targetScope}, domain_site_query: {query: sourceQuery, scope: params.sourceScope}, options, offset: {limit} } }, apiKey)
+            )
+        );
+        const results = await Promise.allSettled(promises);
+        const responseData = results.map(result => result.status === 'fulfilled' ? { status: 'success', data: result.value } : { status: 'error', reason: result.reason.message });
+        return res.status(200).json(responseData);
+    }
+
+
+    // Multi-target endpoints are looped.
+    let promises = [];
+    switch (method) {
       case 'siteMetrics':
         promises = params.targets.map(target =>
           callMozApi("data.site.metrics.fetch", { data: { site_query: { query: target, scope: params.scope } } }, apiKey)
@@ -144,18 +176,6 @@ export default async function handler(req, res) {
           break;
       }
 
-      case 'linkIntersect': {
-        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
-        const options = {
-            minimum_matching_targets: params.minimum_matching_targets,
-            scope: params.scope,
-            sort: params.sort
-        };
-        const promise = callMozApi("data.site.link.intersect.fetch", { data: { is_linking_to: params.is_linking_to, not_linking_to: params.not_linking_to, options, offset: { limit } } }, apiKey);
-        const result = await Promise.resolve(promise);
-        return res.status(200).json([{ status: 'success', data: result }]); 
-      }
-
       case 'listLinks': {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
         const options = { sort: params.sort, filters: params.filters };
@@ -165,10 +185,13 @@ export default async function handler(req, res) {
         break;
       }
 
-      case 'linkStatus': {
-         const promise = callMozApi("data.site.link.status.fetch", { data: { target_site_query: { query: params.targetQuery, scope: params.targetScope }, source_site_query: { query: params.sourceQuery, scope: params.sourceScope } } }, apiKey);
-         const result = await Promise.resolve(promise);
-         return res.status(200).json([{ status: 'success', data: result }]);
+       case 'filterLinksByAnchor': {
+        const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
+        const options = { sort: params.sort, filters: params.filters };
+        promises = params.targets.map(target => 
+          callMozApi("data.site.link.filter.anchor.text", { data: { site_query: { query: target, scope: params.scope }, anchor_text: params.anchorText, options, offset: { limit } } }, apiKey)
+        );
+        break;
       }
 
       default:
@@ -208,7 +231,6 @@ async function callMozApi(apiMethodName, apiParams, apiKey) {
     body: JSON.stringify(payload)
   });
   
-  // Clone the response to safely read it twice
   const resClone = response.clone();
   try {
     const data = await response.json();
@@ -218,13 +240,13 @@ async function callMozApi(apiMethodName, apiParams, apiKey) {
     }
     return data.result;
   } catch (e) {
-      if (e instanceof SyntaxError) { // This will catch the "Unexpected token '<'" error
+      if (e instanceof SyntaxError) { 
           console.error("Failed to parse JSON from Moz API. The API might be temporarily unavailable.");
           const textResponse = await resClone.text();
-          console.error("API Response Text:", textResponse.substring(0, 500)); // Log the first 500 chars
+          console.error("API Response Text:", textResponse.substring(0, 500)); 
           throw new Error("The Moz API returned an invalid response (likely HTML). It may be temporarily busy. Please try again shortly.");
       }
-      throw e; // Re-throw other errors
+      throw e;
   }
 };
 
