@@ -15,18 +15,146 @@ export default async function handler(req, res) {
   }
 
   // --- Main Logic ---
-  const { apiKey, method, params } = req.body;
+  const { apiKey, method, params, openaiApiKey } = req.body;
 
-  if (!apiKey || !method ) {
-    return res.status(400).json({ error: 'Missing API Key or method.' });
+  // OpenAI methods don't need Moz API key
+  if (method !== 'extractContent' && method !== 'getEmbeddings' && method !== 'analyzeWithOpenAI') {
+    if (!apiKey || !method ) {
+      return res.status(400).json({ error: 'Missing API Key or method.' });
+    }
+    // Special case for getQuota which doesn't need params
+    if (method !== 'getQuota' && !params) {
+      return res.status(400).json({ error: 'Missing parameters for this method.' });
+    }
   }
-   // Special case for getQuota which doesn't need params
-  if (method !== 'getQuota' && !params) {
-    return res.status(400).json({ error: 'Missing parameters for this method.' });
+
+  // OpenAI methods need OpenAI API key
+  if ((method === 'getEmbeddings' || method === 'analyzeWithOpenAI') && !openaiApiKey) {
+    return res.status(400).json({ error: 'Missing OpenAI API Key.' });
   }
 
 
   try {
+    // Content extraction endpoint (no API key needed)
+    if (method === 'extractContent') {
+      if (!params || !params.url) {
+        return res.status(400).json({ error: 'Missing URL parameter.' });
+      }
+      try {
+        const response = await fetch(params.url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        
+        // Remove script and style tags using regex
+        let cleanedHtml = html
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+          .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
+        
+        // Extract text content by removing HTML tags
+        let text = cleanedHtml
+          .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&[a-z]+;/gi, ' '); // Remove other HTML entities
+        
+        // Clean up whitespace and limit length
+        const cleanedText = text.replace(/\s+/g, ' ').trim().substring(0, 8000);
+        
+        return res.status(200).json({ content: cleanedText });
+      } catch (error) {
+        console.error('Content extraction error:', error);
+        return res.status(500).json({ error: `Failed to extract content: ${error.message}` });
+      }
+    }
+
+    // OpenAI embeddings endpoint
+    if (method === 'getEmbeddings') {
+      if (!params || !params.text) {
+        return res.status(400).json({ error: 'Missing text parameter.' });
+      }
+      try {
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiApiKey}`
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: params.text
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to get embeddings');
+        }
+        
+        const data = await response.json();
+        return res.status(200).json({ embedding: data.data[0].embedding });
+      } catch (error) {
+        console.error('OpenAI embeddings error:', error);
+        return res.status(500).json({ error: `Failed to get embeddings: ${error.message}` });
+      }
+    }
+
+    // OpenAI chat completion endpoint
+    if (method === 'analyzeWithOpenAI') {
+      if (!params || !params.analysisData) {
+        return res.status(400).json({ error: 'Missing analysisData parameter.' });
+      }
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiApiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4-turbo-preview',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an SEO content analysis expert. Analyze URLs, their ranking keywords, and provide actionable insights about content opportunities and consolidation recommendations. Return your analysis as JSON with the following structure: { "opportunities": [{"subtopic": "...", "keywords": ["..."]}], "recommendations": "..." } or as plain text if JSON is not appropriate.'
+              },
+              {
+                role: 'user',
+                content: JSON.stringify(params.analysisData, null, 2)
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to analyze with OpenAI');
+        }
+        
+        const data = await response.json();
+        return res.status(200).json({ analysis: data.choices[0].message.content });
+      } catch (error) {
+        console.error('OpenAI analysis error:', error);
+        return res.status(500).json({ error: `Failed to analyze with OpenAI: ${error.message}` });
+      }
+    }
+
     // Single-call endpoints are handled and returned immediately.
     if (method === 'getQuota') {
         const quotaData = await callMozApi("quota.lookup", { data: { path: "api.limits.data.rows" } }, apiKey);
@@ -249,4 +377,3 @@ async function callMozApi(apiMethodName, apiParams, apiKey) {
       throw e;
   }
 };
-
