@@ -119,6 +119,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing analysisData parameter.' });
       }
       try {
+        // Use the model from params, with a sensible default
+        const modelToUse = params.model || 'gpt-3.5-turbo';
+        
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -126,7 +129,7 @@ export default async function handler(req, res) {
             'Authorization': `Bearer ${openaiApiKey}`
           },
           body: JSON.stringify({
-            model: 'gpt-4-turbo-preview',
+            model: modelToUse,
             messages: [
               {
                 role: 'system',
