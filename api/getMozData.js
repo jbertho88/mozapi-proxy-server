@@ -122,6 +122,12 @@ export default async function handler(req, res) {
         // Use the model from params, with a sensible default
         const modelToUse = params.model || 'gpt-3.5-turbo';
         
+        // Extract system prompt from analysisData if provided, otherwise use default
+        const systemPrompt = params.analysisData.systemPrompt || 'You are an SEO content analysis expert. Analyze URLs, their ranking keywords, and provide actionable insights about content opportunities and consolidation recommendations. Return your analysis as JSON with the following structure: { "opportunities": [{"subtopic": "...", "keywords": ["..."]}], "recommendations": "..." } or as plain text if JSON is not appropriate.';
+        
+        // Extract user prompt from analysisData
+        const userPrompt = params.analysisData.prompt || JSON.stringify(params.analysisData, null, 2);
+        
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -133,11 +139,11 @@ export default async function handler(req, res) {
             messages: [
               {
                 role: 'system',
-                content: 'You are an SEO content analysis expert. Analyze URLs, their ranking keywords, and provide actionable insights about content opportunities and consolidation recommendations. Return your analysis as JSON with the following structure: { "opportunities": [{"subtopic": "...", "keywords": ["..."]}], "recommendations": "..." } or as plain text if JSON is not appropriate.'
+                content: systemPrompt
               },
               {
                 role: 'user',
-                content: JSON.stringify(params.analysisData, null, 2)
+                content: userPrompt
               }
             ],
             temperature: 0.7,
