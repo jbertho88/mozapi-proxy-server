@@ -1,3 +1,25 @@
+# Proxy Server Code - Updated Content Extraction
+
+This document contains the complete proxy server code with improved content extraction that filters out headers, footers, navigation, and sidebars to focus on main content blocks.
+
+## Key Improvement: Content Extraction
+
+The `extractContent` method has been enhanced to:
+- **Remove semantic HTML5 elements**: `<header>`, `<footer>`, `<nav>`, `<aside>`
+- **Remove common class/ID patterns**: Elements with classes/IDs containing "header", "footer", "nav", "navigation", "sidebar", "menu", "breadcrumb", etc.
+- **Focus on main content**: The 8000-character limit now applies to actual content, not headers/footers
+
+### Benefits:
+- ✅ More accurate similarity scores (less noise from shared headers/footers)
+- ✅ Better consolidation recommendations (based on actual content)
+- ✅ More efficient use of the 8000-character limit (focuses on main content)
+- ✅ Improved content analysis quality for Content Cluster Analysis and URL-to-URL similarity
+
+---
+
+## Complete Proxy Server Code
+
+```javascript
 // Vercel Serverless Function to act as a proxy for the Moz API
 import fetch from 'node-fetch';
 import crypto from 'crypto';
@@ -36,6 +58,7 @@ export default async function handler(req, res) {
 
   try {
     // Content extraction endpoint (no API key needed)
+    // IMPROVED: Filters out headers, footers, navigation, and sidebars to focus on main content
     if (method === 'extractContent') {
       if (!params || !params.url) {
         return res.status(400).json({ error: 'Missing URL parameter.' });
@@ -55,13 +78,26 @@ export default async function handler(req, res) {
         
         const html = await response.text();
         
-        // Remove script and style tags using regex
+        // Step 1: Remove script, style, and noscript tags
         let cleanedHtml = html
           .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
           .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
           .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
         
-        // Extract text content by removing HTML tags
+        // Step 2: Remove common structural elements (headers, footers, navigation, sidebars)
+        // This focuses analysis on main content blocks for better similarity and consolidation recommendations
+        cleanedHtml = cleanedHtml
+          // Remove semantic HTML5 elements
+          .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gis, '')
+          .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gis, '')
+          .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gis, '')
+          .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gis, '')
+          // Remove common class/ID patterns for headers/footers/nav
+          .replace(/<div[^>]*(?:class|id)=["'][^"']*\b(?:header|footer|nav|navigation|sidebar|menu|breadcrumb|topbar|top-bar|site-header|site-footer|main-nav|primary-nav)[^"']*["'][^>]*>.*?<\/div>/gis, '')
+          // Remove common header/footer patterns in other tags
+          .replace(/<[^>]*(?:class|id)=["'][^"']*\b(?:header|footer|nav|navigation|sidebar|menu|breadcrumb|topbar|top-bar|site-header|site-footer|main-nav|primary-nav)[^"']*["'][^>]*>.*?<\/[^>]+>/gis, '');
+        
+        // Step 3: Extract text content by removing HTML tags
         let text = cleanedHtml
           .replace(/<[^>]+>/g, ' ') // Remove HTML tags
           .replace(/&nbsp;/g, ' ')
@@ -72,7 +108,8 @@ export default async function handler(req, res) {
           .replace(/&#39;/g, "'")
           .replace(/&[a-z]+;/gi, ' '); // Remove other HTML entities
         
-        // Clean up whitespace and limit length
+        // Step 4: Clean up whitespace and limit length
+        // Focus on main content - the 8000 char limit now applies to actual content, not headers/footers
         const cleanedText = text.replace(/\s+/g, ' ').trim().substring(0, 8000);
         
         return res.status(200).json({ content: cleanedText });
@@ -386,3 +423,61 @@ async function callMozApi(apiMethodName, apiParams, apiKey) {
       throw e;
   }
 };
+```
+
+---
+
+## Content Extraction Logic Breakdown
+
+### Step 1: Remove Scripts and Styles
+```javascript
+let cleanedHtml = html
+  .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+  .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
+```
+
+### Step 2: Remove Structural Elements
+```javascript
+cleanedHtml = cleanedHtml
+  // Remove semantic HTML5 elements
+  .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gis, '')
+  .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gis, '')
+  .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gis, '')
+  .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gis, '')
+  // Remove common class/ID patterns
+  .replace(/<div[^>]*(?:class|id)=["'][^"']*\b(?:header|footer|nav|navigation|sidebar|menu|breadcrumb|topbar|top-bar|site-header|site-footer|main-nav|primary-nav)[^"']*["'][^>]*>.*?<\/div>/gis, '')
+  .replace(/<[^>]*(?:class|id)=["'][^"']*\b(?:header|footer|nav|navigation|sidebar|menu|breadcrumb|topbar|top-bar|site-header|site-footer|main-nav|primary-nav)[^"']*["'][^>]*>.*?<\/[^>]+>/gis, '');
+```
+
+### Step 3: Extract Text Content
+```javascript
+let text = cleanedHtml
+  .replace(/<[^>]+>/g, ' ') // Remove HTML tags
+  .replace(/&nbsp;/g, ' ')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'")
+  .replace(/&[a-z]+;/gi, ' '); // Remove other HTML entities
+```
+
+### Step 4: Clean and Limit
+```javascript
+const cleanedText = text.replace(/\s+/g, ' ').trim().substring(0, 8000);
+```
+
+---
+
+## Notes
+
+- **Regex Flags Used**: `gis` (global, case-insensitive, dotall) for multiline matching
+- **Character Limit**: 8000 characters (applies to cleaned main content, not headers/footers)
+- **Patterns Removed**: header, footer, nav, navigation, sidebar, menu, breadcrumb, topbar, top-bar, site-header, site-footer, main-nav, primary-nav
+- **Impact**: This change improves Content Cluster Analysis and URL-to-URL similarity by focusing on actual content rather than shared structural elements
+
+---
+
+## Last Updated
+November 2025 - Added content filtering to remove headers/footers/nav for better content analysis
