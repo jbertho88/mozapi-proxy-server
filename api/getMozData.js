@@ -188,10 +188,12 @@ export default async function handler(req, res) {
     if (method === 'linkIntersect') {
         const limit = Math.max(1, Math.min(50, parseInt(params.limit, 10) || 25));
         const options = {
-            minimum_matching_targets: params.minimum_matching_targets,
-            scope: params.scope,
-            sort: params.sort
+            minimum_matching_targets: params.minimum_matching_targets
         };
+        // Only include sort if it's provided and valid
+        if (params.sort && ['matching_target_count', 'source_spam_score', 'source_domain_authority'].includes(params.sort)) {
+            options.sort = params.sort;
+        }
         const result = await callMozApi("data.site.link.intersect.fetch", { data: { is_linking_to: params.is_linking_to, not_linking_to: params.not_linking_to, options, offset: { limit } } }, apiKey);
         return res.status(200).json([{ status: 'success', data: result }]); 
     }
