@@ -5,7 +5,9 @@ import crypto from 'crypto';
 // This is the main handler Vercel will run
 export default async function handler(req, res) {
   // --- CORS Configuration ---
-  res.setHeader('Access-Control-Allow-Origin', 'https://jbmoz-api-tool-ui.vercel.app');
+  // Allow requests from web app and browser extensions
+  // For maximum flexibility (and since this is a proxy without auth), use wildcard:
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
